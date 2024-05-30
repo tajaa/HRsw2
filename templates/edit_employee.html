@@ -1,0 +1,30 @@
+{% extends "base.html" %} {% block content %}
+<h1>Edit Employee</h1>
+<form method="POST">
+  Username:
+  <input
+    type="text"
+    name="username"
+    value="{{ employee.username }}"
+    required
+  /><br />
+  First Name:
+  <input
+    type="text"
+    name="first_name"
+    value="{{ employee.first_name }}"
+    required
+  /><br />
+  Last Name:
+  <input
+    type="text"
+    name="last_name"
+    value="{{ employee.last_name }}"
+    required
+  /><br />
+  Role:
+  <input type="text" name="role" value="{{ employee.role }}" required /><br />
+  Password: <input type="password" name="password" /><br />
+  <button type="submit">Update Employee</button>
+</form>
+{% endblock %}

@@ -1,70 +1,82 @@
-from flask import Flask, jsonify, request
+from flask import Flask, flash, redirect, render_template, request, url_for
+from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import check_password_hash, generate_password_hash
 
-# initialize flask app
 app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///employees.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"] = "your_secret_key"
 
-# simple in memory database to store user data
-users = {}
+db = SQLAlchemy(app)
 
 
-# Define routes and methods for managing users
-@app.route("/users", methods=["POST", "GET"])
-@app.route("/users/<username>", methods=["GET", "PUT", "DELETE"])
-def manage_users(username=None):
-    # handle POST request to create a new user
+class Employee(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    first_name = db.Column(db.String(80), nullable=False)
+    last_name = db.Column(db.String(80), nullable=False)
+    role = db.Column(db.String(80), nullable=False)
+    password = db.Column(db.String(120), nullable=False)
+
+
+@app.route("/")
+def index():
+    employees = Employee.query.all()
+    return render_template("index.html", employees=employees)
+
+
+@app.route("/add", methods=["POST", "GET"])
+def add_employee():
     if request.method == "POST":
-        # get Data sent with the POST request
-        data = request.get_json()
-        # hash the pw for security
-        hashed_password = generate_password_hash(data["password"])
-        # store the user in the dictionary with the hashed password
-        users[data["username"]] = {
-            "first_name": data["first_name"],
-            "last_name": data["last_name"],
-            "role": data["role"],
-            "password": hashed_password,
-        }
-        # return a success message
-        return jsonify({"message": "User added successfully"}), 201
+        username = request.form["username"]
+        first_name = request.form["first_name"]
+        last_name = request.form["last_name"]
+        role = request.form["role"]
+        password = request.form["password"]
+        hashed_password = generate_password_hash(password)
 
-    # handle get request to retrieve one or all users
-    elif request.method == "GET":
-        if username:
-            # Retrieve a specific user by username
-            user = users.get(username)
-            if user:
-                return jsonify(user), 200
-            return jsonify({"message": "User not found"}), 404
-        # return all users if no username is specified
-        return jsonify(users), 200
+        new_employee = Employee(
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            role=role,
+            password=hashed_password,
+        )
+        db.session.add(new_employee)
+        db.session.commit()
+        flash("Employee added successfully!")
+        return redirect(url_for("index"))
 
-    # handle PUT request to update an existing user
-    elif request.method == "PUT":
-        if username in users:
-            # get the data for the update
-            data = request.get_json()
-            user = users[username]
-            # update the user data based on provided JSON keeping existing data if
-            # not specified
-            user["first_name"] = data.get("first_name", user["first_name"])
-            user["last_name"] = data.get("last_name", user["last_name"])
-            user["role"] = data.get("role", user["role"])
-            # update password if its included in the request
-            if "password" in data:
-                user["password"] = generate_password_hash(data["password"])
-            return jsonify({"message": "User updated successfully"}), 200
-        return jsonify({"message": "User not found"}), 404
-
-    # handle DELETE request to remove a user
-    elif request.method == "DELETE":
-        if username in users:
-            # Delete the user from the dictionary
-            del users[username]
-            return jsonify({"message": "User deleted successfully"}), 200
-        return jsonify({"message": "User not found"}), 404
+    return render_template("add_employee.html")
 
 
-# Run the flask application if the script is executed directly
+@app.route("/edit/<int:id>", methods=["GET", "POST"])
+def edit_employee(id):
+    employee = Employee.query.get_or_404(id)
+    if request.method == "POST":
+        employee.username = request.form["username"]
+        employee.first_name = request.form["first_name"]
+        employee.last_name = request.form["last_name"]
+        employee.role = request.form["role"]
+        if request.form["password"]:  # Only update password if field is not empty
+            employee.password = generate_password_hash(request.form["password"])
+        db.session.commit()
+        flash("Employee updated successfully!")
+        return redirect(url_for("index"))
+
+    return render_template("edit_employee.html", employee=employee)
+
+
+@app.route("/delete/<int:id>")
+def delete_employee(id):
+    employee = Employee.query.get_or_404(id)
+    db.session.delete(employee)
+    db.session.commit()
+    flash("Employee deleted successfully!")
+    return redirect(url_for("index"))
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    with app.app_context():
+        db.create_all()
+        app.run(debug=True)
