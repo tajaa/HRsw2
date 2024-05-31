@@ -21,12 +21,14 @@ class Employee(db.Model):
 
 @app.route("/")
 def index():
+    """this renders the index page when its called"""
     employees = Employee.query.all()
     return render_template("index.html", employees=employees)
 
 
 @app.route("/add", methods=["POST", "GET"])
 def add_employee():
+    """here, i wrote a functino for adding new employees"""
     if request.method == "POST":
         username = request.form["username"]
         first_name = request.form["first_name"]
